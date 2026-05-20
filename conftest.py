@@ -10,8 +10,11 @@ load_dotenv(Path(__file__).parent / ".env", override=False)
 
 @pytest_asyncio.fixture
 async def client() -> AsyncIterator[httpx.AsyncClient]:
-    from main import app
+    from main import app, engine
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
-        yield ac
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            yield ac
+    finally:
+        await engine.dispose()

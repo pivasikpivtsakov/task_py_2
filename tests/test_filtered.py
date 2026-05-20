@@ -29,3 +29,38 @@ async def test_paid_orders_with_total_at_least_100_returns_alice(client: httpx.A
     assert order["status"] == "paid"
     assert float(order["total_amount"]) >= 100
     assert order["currency"] == "USD"
+
+
+async def test_non_cancelled_orders_with_expensive_items_joins_alice_and_keyboard(
+    client: httpx.AsyncClient,
+) -> None:
+    payload = {
+        "table": "orders",
+        "filter": {
+            "op": "and",
+            "children": [
+                {"op": "ne", "table": "orders", "field": "status", "value": "cancelled"},
+                {"op": "gt", "table": "items", "field": "unit_price", "value": 40},
+            ],
+        },
+    }
+
+    response = await client.post("/filtered", json=payload)
+
+    assert response.status_code == 200, response.text
+
+    rows = response.json()
+    assert isinstance(rows, list)
+    assert len(rows) == 1
+
+    row = rows[0]
+    assert set(row.keys()) == {"orders", "items"}
+
+    order = row["orders"]
+    assert order["customer_email"] == "alice@example.com"
+    assert order["status"] != "cancelled"
+
+    item = row["items"]
+    assert item["order_id"] == order["id"]
+    assert item["sku"] == "SKU-002"
+    assert float(item["unit_price"]) > 40
