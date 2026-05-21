@@ -72,7 +72,9 @@ def get_redis() -> Redis:
     return redis_client
 
 
-def _instance_to_dict(obj: Base) -> dict[str, Any]:
+def _instance_to_dict(obj: Base | None) -> dict[str, Any] | None:
+    if obj is None:
+        return None
     return {attr.key: getattr(obj, attr.key) for attr in inspect(obj).mapper.column_attrs}
 
 
@@ -81,13 +83,13 @@ async def filtered(
     payload: FilteredRequest,
     session: AsyncSession = Depends(get_session),
     redis: Redis = Depends(get_redis),
-) -> list[dict[str, dict[str, Any]]]:
+) -> list[dict[str, dict[str, Any] | None]]:
     cache_key = make_filtered_cache_key(payload)
     cached = await get_cached_filtered(client=redis, key=cache_key)
     if cached is not None:
         return cached
 
-    stmt = compile_filter(primary_table=payload.table, tree=payload.filter)
+    stmt = compile_filter(primary_table=payload.table, tree=payload.filter, joins=payload.joins)
     entities: list[type[Base]] = [desc["entity"] for desc in stmt.column_descriptions]
 
     result = await session.execute(stmt)

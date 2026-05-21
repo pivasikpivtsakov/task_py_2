@@ -71,6 +71,7 @@ from pydantic import BaseModel, Field, model_validator
 Scalar = bool | int | float | str | None
 ComparisonOp = Literal["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin"]
 LogicalOp = Literal["and", "or"]
+JoinType = Literal["inner", "left"]
 
 _LIST_OPS: frozenset[str] = frozenset({"in", "nin"})
 
@@ -107,3 +108,4 @@ LogicalNodeSchema.model_rebuild()
 class FilteredRequest(BaseModel):
     table: str = Field(min_length=1)
     filter: FilterNodeSchema
+    joins: dict[str, JoinType] = Field(default_factory=dict)

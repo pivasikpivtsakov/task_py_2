@@ -1,5 +1,5 @@
 import operator
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from sqlalchemy import ColumnElement, Select, and_, inspect, or_, select
@@ -10,6 +10,7 @@ from schema.filter import (
     ComparisonNodeSchema,
     ComparisonOp,
     FilterNodeSchema,
+    JoinType,
     LogicalNodeSchema,
     LogicalOp,
 )
@@ -67,10 +68,16 @@ def _to_clause(node: FilterNodeSchema) -> ColumnElement[bool]:
     return _OP_BUILDERS[node.op](column, node.value)
 
 
-def compile_filter(*, primary_table: str, tree: FilterNodeSchema) -> Select[Any]:
+def compile_filter(
+    *,
+    primary_table: str,
+    tree: FilterNodeSchema,
+    joins: Mapping[str, JoinType] | None = None,
+) -> Select[Any]:
     if primary_table not in TABLE_REGISTRY:
         raise ValueError(f"unknown primary table '{primary_table}'")
     primary = TABLE_REGISTRY[primary_table]
+    joins = joins or {}
 
     referenced = _collect_tables(tree)
     referenced.discard(primary_table)
@@ -78,9 +85,19 @@ def compile_filter(*, primary_table: str, tree: FilterNodeSchema) -> Select[Any]
     if unknown:
         raise ValueError(f"unknown referenced tables: {unknown}")
 
-    related = sorted(referenced)
+    if primary_table in joins:
+        raise ValueError(f"cannot declare a join for the primary table '{primary_table}'")
+    unknown_join_targets = sorted(t for t in joins if t not in TABLE_REGISTRY)
+    if unknown_join_targets:
+        raise ValueError(f"unknown join target tables: {unknown_join_targets}")
+
+    related = sorted(referenced | joins.keys())
     related_models = [TABLE_REGISTRY[t] for t in related]
     stmt = select(primary, *related_models)
     for related_table in related:
-        stmt = stmt.join(_resolve_join(primary=primary, target_table=related_table))
+        relationship = _resolve_join(primary=primary, target_table=related_table)
+        if joins.get(related_table, "inner") == "left":
+            stmt = stmt.outerjoin(relationship)
+        else:
+            stmt = stmt.join(relationship)
     return stmt.where(_to_clause(tree))

@@ -106,3 +106,40 @@ async def test_paid_orders_joined_with_items_returns_all_alice_items(
     assert float(items_by_sku["SKU-001"]["unit_price"]) == 29.99
     assert float(items_by_sku["SKU-002"]["unit_price"]) == 89.99
     assert float(items_by_sku["SKU-003"]["unit_price"]) == 9.99
+
+
+async def test_paid_orders_left_joined_with_items_keeps_orphan_order(
+    client: httpx.AsyncClient,
+) -> None:
+    payload = {
+        "table": "orders",
+        "joins": {"items": "left"},
+        "filter": {"op": "eq", "table": "orders", "field": "status", "value": "paid"},
+    }
+
+    response = await client.post("/filtered", json=payload)
+
+    assert response.status_code == 200, response.text
+
+    rows = response.json()
+    assert isinstance(rows, list)
+    assert len(rows) == 4
+
+    for row in rows:
+        assert set(row.keys()) == {"orders", "items"}
+        assert row["orders"]["status"] == "paid"
+
+    alice_rows = [row for row in rows if row["orders"]["customer_email"] == "alice@example.com"]
+    eve_rows = [row for row in rows if row["orders"]["customer_email"] == "eve@example.com"]
+
+    assert len(alice_rows) == 3
+    assert len(eve_rows) == 1
+
+    alice_items_by_sku = {row["items"]["sku"]: row["items"] for row in alice_rows}
+    assert set(alice_items_by_sku.keys()) == {"SKU-001", "SKU-002", "SKU-003"}
+    for item in alice_items_by_sku.values():
+        assert item["order_id"] == alice_rows[0]["orders"]["id"]
+
+    [eve_row] = eve_rows
+    assert eve_row["items"] is None
+    assert float(eve_row["orders"]["total_amount"]) == 75.00

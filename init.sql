@@ -109,7 +109,8 @@ with new_orders as (
         ('alice@example.com', 'Alice Johnson',  'paid',      129.97, 'USD', 'gift wrap please'),
         ('bob@example.com',   'Bob Smith',      'shipped',    49.50, 'USD', null),
         ('carol@example.com', 'Carol Martinez', 'pending',    15.00, 'EUR', null),
-        ('dave@example.com',  'Dave Wilson',    'cancelled',   0.00, 'USD', 'duplicate order')
+        ('dave@example.com',  'Dave Wilson',    'cancelled',   0.00, 'USD', 'duplicate order'),
+        ('eve@example.com',   'Eve Davis',      'paid',       75.00, 'USD', 'no items yet')
     returning id, customer_email
 )
 insert into items (order_id, sku, name, quantity, unit_price)
