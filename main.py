@@ -11,37 +11,67 @@
     - добавить тип джоина в фильтр
     - избавиться от алхимии при генерации запроса
     - упростить редис, очень простая инвалидация при записи
+
+идея:
+    - один фильтр на одну таблицу, то что щас это хардкор
 """
 
+import asyncio
+import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from decimal import Decimal
 from typing import Any
 
+import asyncpg
 from fastapi import Depends, FastAPI
 from redis.asyncio import Redis
-from sqlalchemy import URL, inspect
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from cache.filtered import get_cached_filtered, make_filtered_cache_key, set_cached_filtered
-from models.db import Base
 from models.filter import compile_filter
 from schema.filter import FilteredRequest
 
+_pool: asyncpg.Pool | None = None
+_pool_lock = asyncio.Lock()
 
-def _db_url() -> URL:
-    return URL.create(
-        drivername="postgresql+asyncpg",
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ["POSTGRES_PORT"]),
-        database=os.environ["POSTGRES_DB"],
+
+def _decode_jsonb(raw: str) -> Any:
+    return json.loads(raw, parse_float=Decimal)
+
+
+async def _init_connection(conn: asyncpg.Connection) -> None:
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=json.dumps,
+        decoder=_decode_jsonb,
+        schema="pg_catalog",
     )
 
 
-engine = create_async_engine(_db_url(), pool_pre_ping=True)
-SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+async def get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        async with _pool_lock:
+            if _pool is None:
+                _pool = await asyncpg.create_pool(
+                    user=os.environ["POSTGRES_USER"],
+                    password=os.environ["POSTGRES_PASSWORD"],
+                    host=os.environ["POSTGRES_HOST"],
+                    port=int(os.environ["POSTGRES_PORT"]),
+                    database=os.environ["POSTGRES_DB"],
+                    init=_init_connection,
+                )
+    assert _pool is not None
+    return _pool
+
+
+async def close_pool() -> None:
+    global _pool
+    if _pool is not None:
+        await _pool.close()
+        _pool = None
+
 
 redis_client: Redis = Redis(
     host=os.environ["REDIS_HOST"],
@@ -56,32 +86,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        await engine.dispose()
+        await close_pool()
         await redis_client.aclose()
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-async def get_session() -> AsyncIterator[AsyncSession]:
-    async with SessionLocal() as session:
-        yield session
+async def get_connection() -> AsyncIterator[asyncpg.Connection]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        yield conn
 
 
 def get_redis() -> Redis:
     return redis_client
 
 
-def _instance_to_dict(obj: Base | None) -> dict[str, Any] | None:
-    if obj is None:
-        return None
-    return {attr.key: getattr(obj, attr.key) for attr in inspect(obj).mapper.column_attrs}
-
-
 @app.post("/filtered")
 async def filtered(
     payload: FilteredRequest,
-    session: AsyncSession = Depends(get_session),
+    conn: asyncpg.Connection = Depends(get_connection),
     redis: Redis = Depends(get_redis),
 ) -> list[dict[str, dict[str, Any] | None]]:
     cache_key = make_filtered_cache_key(payload)
@@ -89,13 +114,9 @@ async def filtered(
     if cached is not None:
         return cached
 
-    stmt = compile_filter(primary_table=payload.table, tree=payload.filter, joins=payload.joins)
-    entities: list[type[Base]] = [desc["entity"] for desc in stmt.column_descriptions]
+    compiled = compile_filter(primary_table=payload.table, tree=payload.filter, joins=payload.joins)
+    records = await conn.fetch(compiled.sql, *compiled.params)
+    rows = [dict(r) for r in records]
 
-    result = await session.execute(stmt)
-    rows = [
-        {entity.__tablename__: _instance_to_dict(row[idx]) for idx, entity in enumerate(entities)}
-        for row in result.all()
-    ]
     await set_cached_filtered(client=redis, key=cache_key, value=rows, ttl_s=CACHE_TTL_S)
     return rows

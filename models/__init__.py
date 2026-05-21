@@ -1,11 +1,10 @@
-from models.db import TABLE_REGISTRY, Base, Filter, Item, Order
-from models.filter import compile_filter
+from models.db import TABLE_REGISTRY, JoinSpec, TableSpec
+from models.filter import CompiledQuery, compile_filter
 
 __all__ = [
-    "Base",
-    "Filter",
-    "Item",
-    "Order",
+    "CompiledQuery",
+    "JoinSpec",
     "TABLE_REGISTRY",
+    "TableSpec",
     "compile_filter",
 ]

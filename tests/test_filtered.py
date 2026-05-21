@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import httpx
 
 
@@ -27,7 +29,7 @@ async def test_paid_orders_with_total_at_least_100_returns_alice(client: httpx.A
     order = row["orders"]
     assert order["customer_email"] == "alice@example.com"
     assert order["status"] == "paid"
-    assert float(order["total_amount"]) >= 100
+    assert Decimal(order["total_amount"]) >= Decimal("100")
     assert order["currency"] == "USD"
 
 
@@ -63,7 +65,7 @@ async def test_non_cancelled_orders_with_expensive_items_joins_alice_and_keyboar
     item = row["items"]
     assert item["order_id"] == order["id"]
     assert item["sku"] == "SKU-002"
-    assert float(item["unit_price"]) > 40
+    assert Decimal(item["unit_price"]) > Decimal("40")
 
 
 async def test_paid_orders_joined_with_items_returns_all_alice_items(
@@ -103,9 +105,9 @@ async def test_paid_orders_joined_with_items_returns_all_alice_items(
     assert items_by_sku["SKU-001"]["name"] == "Wireless Mouse"
     assert items_by_sku["SKU-002"]["name"] == "Mechanical Keyboard"
     assert items_by_sku["SKU-003"]["name"] == "USB-C Cable 1m"
-    assert float(items_by_sku["SKU-001"]["unit_price"]) == 29.99
-    assert float(items_by_sku["SKU-002"]["unit_price"]) == 89.99
-    assert float(items_by_sku["SKU-003"]["unit_price"]) == 9.99
+    assert Decimal(items_by_sku["SKU-001"]["unit_price"]) == Decimal("29.99")
+    assert Decimal(items_by_sku["SKU-002"]["unit_price"]) == Decimal("89.99")
+    assert Decimal(items_by_sku["SKU-003"]["unit_price"]) == Decimal("9.99")
 
 
 async def test_paid_orders_left_joined_with_items_keeps_orphan_order(
@@ -142,4 +144,4 @@ async def test_paid_orders_left_joined_with_items_keeps_orphan_order(
 
     [eve_row] = eve_rows
     assert eve_row["items"] is None
-    assert float(eve_row["orders"]["total_amount"]) == 75.00
+    assert Decimal(eve_row["orders"]["total_amount"]) == Decimal("75.00")

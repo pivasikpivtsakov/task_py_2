@@ -64,11 +64,12 @@ Examples:
         }
     }
 """
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-Scalar = bool | int | float | str | None
+Scalar = bool | int | Decimal | str | None
 ComparisonOp = Literal["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin"]
 LogicalOp = Literal["and", "or"]
 JoinType = Literal["inner", "left"]
