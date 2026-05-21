@@ -64,3 +64,45 @@ async def test_non_cancelled_orders_with_expensive_items_joins_alice_and_keyboar
     assert item["order_id"] == order["id"]
     assert item["sku"] == "SKU-002"
     assert float(item["unit_price"]) > 40
+
+
+async def test_paid_orders_joined_with_items_returns_all_alice_items(
+    client: httpx.AsyncClient,
+) -> None:
+    payload = {
+        "table": "orders",
+        "filter": {
+            "op": "and",
+            "children": [
+                {"op": "eq", "table": "orders", "field": "status", "value": "paid"},
+                {"op": "gt", "table": "items", "field": "quantity", "value": 0},
+            ],
+        },
+    }
+
+    response = await client.post("/filtered", json=payload)
+
+    assert response.status_code == 200, response.text
+
+    rows = response.json()
+    assert isinstance(rows, list)
+    assert len(rows) == 3
+
+    for row in rows:
+        assert set(row.keys()) == {"orders", "items"}
+        assert row["orders"]["customer_email"] == "alice@example.com"
+        assert row["orders"]["status"] == "paid"
+        assert row["items"]["order_id"] == row["orders"]["id"]
+        assert row["items"]["quantity"] > 0
+
+    order_ids = {row["orders"]["id"] for row in rows}
+    assert len(order_ids) == 1
+
+    items_by_sku = {row["items"]["sku"]: row["items"] for row in rows}
+    assert set(items_by_sku.keys()) == {"SKU-001", "SKU-002", "SKU-003"}
+    assert items_by_sku["SKU-001"]["name"] == "Wireless Mouse"
+    assert items_by_sku["SKU-002"]["name"] == "Mechanical Keyboard"
+    assert items_by_sku["SKU-003"]["name"] == "USB-C Cable 1m"
+    assert float(items_by_sku["SKU-001"]["unit_price"]) == 29.99
+    assert float(items_by_sku["SKU-002"]["unit_price"]) == 89.99
+    assert float(items_by_sku["SKU-003"]["unit_price"]) == 9.99

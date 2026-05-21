@@ -13,16 +13,17 @@
     - упростить редис, очень простая инвалидация при записи
 """
 
-
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI
+from redis.asyncio import Redis
 from sqlalchemy import URL, inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from cache.filtered import get_cached_filtered, make_filtered_cache_key, set_cached_filtered
 from models.db import Base
 from models.filter import compile_filter
 from schema.filter import FilteredRequest
@@ -42,6 +43,13 @@ def _db_url() -> URL:
 engine = create_async_engine(_db_url(), pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+redis_client: Redis = Redis(
+    host=os.environ["REDIS_HOST"],
+    port=int(os.environ["REDIS_PORT"]),
+    db=int(os.environ["REDIS_DB"]),
+)
+CACHE_TTL_S: int = int(os.environ["CACHE_TTL_S"])
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -49,6 +57,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await engine.dispose()
+        await redis_client.aclose()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -59,6 +68,10 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+def get_redis() -> Redis:
+    return redis_client
+
+
 def _instance_to_dict(obj: Base) -> dict[str, Any]:
     return {attr.key: getattr(obj, attr.key) for attr in inspect(obj).mapper.column_attrs}
 
@@ -67,12 +80,20 @@ def _instance_to_dict(obj: Base) -> dict[str, Any]:
 async def filtered(
     payload: FilteredRequest,
     session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis),
 ) -> list[dict[str, dict[str, Any]]]:
+    cache_key = make_filtered_cache_key(payload)
+    cached = await get_cached_filtered(client=redis, key=cache_key)
+    if cached is not None:
+        return cached
+
     stmt = compile_filter(primary_table=payload.table, tree=payload.filter)
     entities: list[type[Base]] = [desc["entity"] for desc in stmt.column_descriptions]
 
     result = await session.execute(stmt)
-    return [
+    rows = [
         {entity.__tablename__: _instance_to_dict(row[idx]) for idx, entity in enumerate(entities)}
         for row in result.all()
     ]
+    await set_cached_filtered(client=redis, key=cache_key, value=rows, ttl_s=CACHE_TTL_S)
+    return rows
