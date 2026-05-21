@@ -10,11 +10,15 @@ load_dotenv(Path(__file__).parent / ".env", override=False)
 
 @pytest_asyncio.fixture
 async def client() -> AsyncIterator[httpx.AsyncClient]:
+    # imported lazily so load_dotenv runs before main reads env vars
     from main import app, close_pool
 
     transport = httpx.ASGITransport(app=app)
     try:
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as ac:
             yield ac
     finally:
         await close_pool()

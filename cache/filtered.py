@@ -9,9 +9,9 @@ from schema.filter import FilteredRequest
 
 _KEY_PREFIX = "filter"
 _KEY_ALGO = "sha256"
-_RESPONSE_ADAPTER: TypeAdapter[list[dict[str, dict[str, Any] | None]]] = TypeAdapter(
-    list[dict[str, dict[str, Any] | None]]
-)
+
+FilteredRows = list[dict[str, dict[str, Any] | None]]
+_RESPONSE_ADAPTER: TypeAdapter[FilteredRows] = TypeAdapter(FilteredRows)
 
 
 def make_filtered_cache_key(payload: FilteredRequest) -> str:
@@ -19,7 +19,11 @@ def make_filtered_cache_key(payload: FilteredRequest) -> str:
     return f"{_KEY_PREFIX}:{_KEY_ALGO}:{digest}"
 
 
-async def get_cached_filtered(*, client: Redis, key: str) -> list[dict[str, dict[str, Any] | None]] | None:
+async def get_cached_filtered(
+    *,
+    client: Redis,
+    key: str,
+) -> FilteredRows | None:
     try:
         raw = await client.get(key)
     except RedisError:
@@ -33,7 +37,7 @@ async def set_cached_filtered(
     *,
     client: Redis,
     key: str,
-    value: list[dict[str, dict[str, Any] | None]],
+    value: FilteredRows,
     ttl_s: int,
 ) -> None:
     payload = _RESPONSE_ADAPTER.dump_json(value)

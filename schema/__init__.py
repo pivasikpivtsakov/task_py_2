@@ -11,8 +11,8 @@ from schema.filter import (
 __all__ = [
     "ComparisonNodeSchema",
     "ComparisonOp",
-    "FilteredRequest",
     "FilterNodeSchema",
+    "FilteredRequest",
     "LogicalNodeSchema",
     "LogicalOp",
     "Scalar",

@@ -2,32 +2,38 @@
 Filter shape reference.
 
 A filter request targets one primary table and carries a tree of nodes.
-The compiler (models.filter.compile_filter) takes the primary table plus the tree,
-auto-joins any related tables referenced by comparison nodes (via SQLAlchemy
-relationships declared in models.db), and emits a single SELECT.
+The compiler (models.filter.compile_filter) takes the primary table plus
+the tree, auto-joins any related tables referenced by comparison nodes
+(via SQLAlchemy relationships declared in models.db), and emits a single
+SELECT.
 
 Top-level shape:
     {
-        "table": "<primary table name>",        # FROM table
-        "filter": <FilterNodeSchema>            # tree of and/or/comparison nodes
+        "table": "<primary table name>",   # FROM table
+        "filter": <FilterNodeSchema>       # tree of and/or/comparison nodes
     }
 
 Node types:
     LogicalNodeSchema:
         {"op": "and" | "or", "children": [<FilterNodeSchema>, ...]}
     ComparisonNodeSchema:
-        {"op": <ComparisonOp>, "table": "<tname>", "field": "<fname>", "value": <scalar | [scalars]>}
+        {
+            "op": <ComparisonOp>,
+            "table": "<tname>",
+            "field": "<fname>",
+            "value": <scalar | [scalars]>,
+        }
 
 Comparison ops:
     "eq", "ne", "gt", "gte", "lt", "lte"   -> scalar value
     "in",  "nin"                            -> list value
 
 Cross-table semantics:
-    Any comparison node may target a table other than the primary, as long as
-    the SQLAlchemy model for the primary declares a relationship to that table.
-    The compiler emits an INNER JOIN; result rows are (primary, related)
-    tuples — orders with multiple matching items appear multiple times,
-    orders with no matching items don't appear.
+    Any comparison node may target a table other than the primary, as long
+    as the SQLAlchemy model for the primary declares a relationship to that
+    table. The compiler emits an INNER JOIN; result rows are
+    (primary, related) tuples — orders with multiple matching items appear
+    multiple times, orders with no matching items don't appear.
 
 Examples:
 
@@ -37,22 +43,42 @@ Examples:
         "filter": {
             "op": "and",
             "children": [
-                {"op": "eq",  "table": "orders", "field": "status",       "value": "paid"},
-                {"op": "gte", "table": "orders", "field": "total_amount", "value": 100}
-            ]
-        }
+                {
+                    "op": "eq",
+                    "table": "orders",
+                    "field": "status",
+                    "value": "paid",
+                },
+                {
+                    "op": "gte",
+                    "table": "orders",
+                    "field": "total_amount",
+                    "value": 100,
+                },
+            ],
+        },
     }
 
-    # cross-table: non-cancelled orders that have an item with unit_price > 40
+    # cross-table: non-cancelled orders with an item with unit_price > 40
     {
         "table": "orders",
         "filter": {
             "op": "and",
             "children": [
-                {"op": "ne", "table": "orders", "field": "status",     "value": "cancelled"},
-                {"op": "gt", "table": "items",  "field": "unit_price", "value": 40}
-            ]
-        }
+                {
+                    "op": "ne",
+                    "table": "orders",
+                    "field": "status",
+                    "value": "cancelled",
+                },
+                {
+                    "op": "gt",
+                    "table": "items",
+                    "field": "unit_price",
+                    "value": 40,
+                },
+            ],
+        },
     }
 
     # items only with IN list
@@ -64,6 +90,7 @@ Examples:
         }
     }
 """
+
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -87,9 +114,11 @@ class ComparisonNodeSchema(BaseModel):
     def _check_value_shape(self) -> "ComparisonNodeSchema":
         is_list_value = isinstance(self.value, list)
         if self.op in _LIST_OPS and not is_list_value:
-            raise ValueError(f"op '{self.op}' requires a list value")
+            msg = f"op '{self.op}' requires a list value"
+            raise ValueError(msg)
         if self.op not in _LIST_OPS and is_list_value:
-            raise ValueError(f"op '{self.op}' requires a scalar value")
+            msg = f"op '{self.op}' requires a scalar value"
+            raise ValueError(msg)
         return self
 
 

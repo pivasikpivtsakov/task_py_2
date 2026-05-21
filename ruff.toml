@@ -1,0 +1,144 @@
+# Project-specific
+line-length = 79
+target-version = "py311"
+
+exclude = [
+    "*.ipynb",
+    "legacy/"
+]
+
+
+# General (https://beta.ruff.rs/docs/rules/)
+lint.select = [
+    "B020",
+    "F",        # Pyflakes
+    "C90",      # mccabe
+    "I",        # isort
+    "N",        # pep8-naming
+    # "D",      # pydocstyle
+    "UP",       # pyupgrade
+
+    "ERA",      # eradicate
+    "PD",       # pandas-vet
+    "PGH",      # pygrep-hooks
+    "TRY",      # tryceratops
+    "FLY",      # flynt
+    "NPY",      # NumPy-specific rules
+    "AIR",      # Airflow
+    "PERF",     # Perflint
+    "RUF",      # Ruff-specific rules
+
+    # pycodestyle
+    "E",        # pycodestyle errors
+    "W",        # pycodestyle warnings
+
+    # flake8
+    "YTT",      # flake8-2020
+    "ANN",      # flake8-annotations
+    "ASYNC",    # flake8-async
+    "S",        # flake8-bandit
+    # "BLE",    # flake8-blind-except
+    # "FBT",    # flake8-boolean-trap
+    "B",        # flake8-bugbear
+    "A",        # flake8-builtins
+    "COM",      # flake8-commas
+    "C4",       # flake8-comprehensions
+    "DTZ",      # flake8-datetimez
+    "T10",      # flake8-debugger
+    "DJ",       # flake8-django
+    "EM",       # flake8-errmsg
+    "EXE",      # flake8-executable
+    # "FA",     # flake8-future-annotations
+    "ISC",      # flake8-implicit-str-concat
+    "ICN",      # flake8-import-conventions
+    "G",        # flake8-logging-format
+    # "INP",    # flake8-no-pep420
+    "PIE",      # flake8-pie
+    "T20",      # flake8-print
+    "PYI",      # flake8-pyi
+    "PT",       # flake8-pytest-style
+    # "Q",        # flake8-quotes
+    "RSE",      # flake8-raise
+    "RET",      # flake8-return
+    "SLF",      # flake8-self
+    "SLOT",     # flake8-slots
+    "SIM",      # flake8-simplify
+    "TID",      # flake8-tidy-imports
+    "TCH",      # flake8-type-checking
+    "INT",      # flake8-gettext
+    "ARG",      # flake8-unused-arguments
+    # "PTH",    # flake8-use-pathlib
+    "TD",       # flake8-todos
+    "FIX",      # flake8fixme
+
+    # Pylint
+    "PLC", "PLE", "PLR", "PLW",
+]
+
+lint.ignore = [
+    # isort (https://pycqa.github.io/isort/docs/configuration/options/)
+    "I001",     # Import block is un-sorted or un-formatted (bugs with real 'isort')
+
+    # tryceratops (https://pypi.org/project/tryceratops/)
+    "TRY400",   # Use `logging.exception` instead of `logging.error`
+
+    # flake8-annotations (https://pypi.org/project/flake8-annotations/)
+    "ANN003",   # Missing type annotation for `**kwargs`
+    "ANN101",   # Missing type annotation for function argument (bugs with 'self')
+    "ANN102",   # Missing type annotation for *args (bugs with 'cls')
+    "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in `*args` \ `**kwargs`
+
+    # flake8-bandit (https://pypi.org/project/flake8-bandit/)
+    "S101",     # Use of `assert` detected
+    "S105",     # Possible hardcoded password assigned to: "<...>"
+    "S106",     # Possible hardcoded password assigned to argument: "<...>"
+    "S113",     # Probable use of requests call without timeout
+    "RET501",     # Do not explicitly return None in function if it is the only possible return value
+    "COM812",   # Trailing comma missing
+    "ARG001",   # Unused function argument
+    "ARG002",   # Unused method argument
+    "UP007",    # Use `X | Y` for type annotations
+    "UP006",    # Use `dict` instead of `Dict` for type annotation
+    "TRY300",   # Consider moving this statement to an `else` block
+    "UP035",    # `typing.Dict` is deprecated, use `dict` instead
+    "EXE002",   # The file is executable but no shebang is present
+    "DJ001",    # Avoid using `null=True` on string-based fields such as CharField
+    "RET503",   # Missing explicit `return` at the end of function able to return non-`None` value
+    "FIX002",   # Line contains TODO, consider resolving the issue
+    "TD003",    #  Missing issue link on the line following this TODO
+
+    # flake8-builtins (https://pypi.org/project/flake8-builtins/)
+    "A003",     # Class attribute `XXX` is shadowing a python builtin (dataclass attributes)
+    "RUF002",
+    "B008",
+    "RUF001"
+]
+[lint.pylint]
+max-args = 10
+
+[lint.per-file-ignores]
+"*/migrations/*" = [
+    "D100",     # Missing docstring in public module
+    "D103",     # Missing docstring in public function
+    "D400",     # First line should end with a period
+    "D415",     # First line should end with a period, question mark, or exclamation point
+    "E501",     # Line too long
+    "RUF012",   # Mutable class attributes should be annotated with `typing.ClassVar`
+    "EXE002",   # The file is executable but no shebang is present
+    "N999"
+]
+"tests/*" = [
+    "S101",     # Use of `assert` detected
+    "PLR2004",# Magic value used in comparison, consider replacing <...> with a constant variable
+    "ANN201",
+    "RET504",
+    "PT023"
+]
+"api/v2/endpoints/*" = [
+    "ANN201"
+]
+"utilities/templates/*" = [
+    "E501",
+    "W293",
+    
+]

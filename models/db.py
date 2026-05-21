@@ -1,6 +1,10 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
+from schema.rows import ItemsRow, OrdersRow
+
 
 @dataclass(frozen=True)
 class JoinSpec:
@@ -10,27 +14,21 @@ class JoinSpec:
 
 @dataclass(frozen=True)
 class TableSpec:
-    columns: frozenset[str]
+    row_model: type[BaseModel]
     joins: Mapping[str, JoinSpec]
+
+    @property
+    def columns(self) -> frozenset[str]:
+        return frozenset(self.row_model.model_fields)
 
 
 TABLE_REGISTRY: dict[str, TableSpec] = {
     "orders": TableSpec(
-        columns=frozenset({
-            "id", "customer_email", "customer_name", "status",
-            "total_amount", "currency", "note", "created_dt", "updated_dt",
-        }),
+        row_model=OrdersRow,
         joins={"items": JoinSpec(self_column="id", other_column="order_id")},
     ),
     "items": TableSpec(
-        columns=frozenset({
-            "id", "order_id", "sku", "name", "quantity",
-            "unit_price", "created_dt", "updated_dt",
-        }),
+        row_model=ItemsRow,
         joins={"orders": JoinSpec(self_column="order_id", other_column="id")},
-    ),
-    "filters": TableSpec(
-        columns=frozenset({"id", "filter_rules", "created_dt", "updated_dt"}),
-        joins={},
     ),
 }

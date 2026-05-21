@@ -1,6 +1,5 @@
 drop table if exists items   cascade;
 drop table if exists orders  cascade;
-drop table if exists filters cascade;
 drop function if exists set_updated_dt cascade;
 
 
@@ -13,20 +12,6 @@ begin
     return new;
 end;
 $$;
-
-
-create table filters (
-    id           bigint      generated always as identity primary key,
-    filter_rules jsonb       not null,
-    created_dt   timestamptz not null default now(),
-    updated_dt   timestamptz not null default now()
-);
-
-create trigger filters_set_updated_dt
-    before update on filters
-    for each row
-    when (old.* is distinct from new.*)
-    execute function set_updated_dt();
 
 
 create table orders (
@@ -72,36 +57,6 @@ create trigger items_set_updated_dt
     for each row
     when (old.* is distinct from new.*)
     execute function set_updated_dt();
-
-
-insert into filters (filter_rules) values
-    ('{
-        "table": "orders",
-        "filter": {
-            "op": "and",
-            "children": [
-                {"op": "eq",  "table": "orders", "field": "status",       "value": "paid"},
-                {"op": "gte", "table": "orders", "field": "total_amount", "value": 100}
-            ]
-        }
-    }'::jsonb),
-    ('{
-        "table": "orders",
-        "filter": {
-            "op": "and",
-            "children": [
-                {"op": "ne", "table": "orders", "field": "status",     "value": "cancelled"},
-                {"op": "gt", "table": "items",  "field": "unit_price", "value": 40}
-            ]
-        }
-    }'::jsonb),
-    ('{
-        "table": "items",
-        "filter": {
-            "op": "in", "table": "items", "field": "sku",
-            "value": ["SKU-002", "SKU-011", "SKU-030"]
-        }
-    }'::jsonb);
 
 
 with new_orders as (

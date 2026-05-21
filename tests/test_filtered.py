@@ -3,14 +3,26 @@ from decimal import Decimal
 import httpx
 
 
-async def test_paid_orders_with_total_at_least_100_returns_alice(client: httpx.AsyncClient) -> None:
+async def test_paid_orders_with_total_at_least_100_returns_alice(
+    client: httpx.AsyncClient,
+) -> None:
     payload = {
         "table": "orders",
         "filter": {
             "op": "and",
             "children": [
-                {"op": "eq", "table": "orders", "field": "status", "value": "paid"},
-                {"op": "gte", "table": "orders", "field": "total_amount", "value": 100},
+                {
+                    "op": "eq",
+                    "table": "orders",
+                    "field": "status",
+                    "value": "paid",
+                },
+                {
+                    "op": "gte",
+                    "table": "orders",
+                    "field": "total_amount",
+                    "value": 100,
+                },
             ],
         },
     }
@@ -33,7 +45,7 @@ async def test_paid_orders_with_total_at_least_100_returns_alice(client: httpx.A
     assert order["currency"] == "USD"
 
 
-async def test_non_cancelled_orders_with_expensive_items_joins_alice_and_keyboard(
+async def test_non_cancelled_with_expensive_items_joins_alice_and_keyboard(
     client: httpx.AsyncClient,
 ) -> None:
     payload = {
@@ -41,8 +53,18 @@ async def test_non_cancelled_orders_with_expensive_items_joins_alice_and_keyboar
         "filter": {
             "op": "and",
             "children": [
-                {"op": "ne", "table": "orders", "field": "status", "value": "cancelled"},
-                {"op": "gt", "table": "items", "field": "unit_price", "value": 40},
+                {
+                    "op": "ne",
+                    "table": "orders",
+                    "field": "status",
+                    "value": "cancelled",
+                },
+                {
+                    "op": "gt",
+                    "table": "items",
+                    "field": "unit_price",
+                    "value": 40,
+                },
             ],
         },
     }
@@ -76,8 +98,18 @@ async def test_paid_orders_joined_with_items_returns_all_alice_items(
         "filter": {
             "op": "and",
             "children": [
-                {"op": "eq", "table": "orders", "field": "status", "value": "paid"},
-                {"op": "gt", "table": "items", "field": "quantity", "value": 0},
+                {
+                    "op": "eq",
+                    "table": "orders",
+                    "field": "status",
+                    "value": "paid",
+                },
+                {
+                    "op": "gt",
+                    "table": "items",
+                    "field": "quantity",
+                    "value": 0,
+                },
             ],
         },
     }
@@ -116,7 +148,12 @@ async def test_paid_orders_left_joined_with_items_keeps_orphan_order(
     payload = {
         "table": "orders",
         "joins": {"items": "left"},
-        "filter": {"op": "eq", "table": "orders", "field": "status", "value": "paid"},
+        "filter": {
+            "op": "eq",
+            "table": "orders",
+            "field": "status",
+            "value": "paid",
+        },
     }
 
     response = await client.post("/filtered", json=payload)
@@ -131,13 +168,23 @@ async def test_paid_orders_left_joined_with_items_keeps_orphan_order(
         assert set(row.keys()) == {"orders", "items"}
         assert row["orders"]["status"] == "paid"
 
-    alice_rows = [row for row in rows if row["orders"]["customer_email"] == "alice@example.com"]
-    eve_rows = [row for row in rows if row["orders"]["customer_email"] == "eve@example.com"]
+    alice_rows = [
+        row
+        for row in rows
+        if row["orders"]["customer_email"] == "alice@example.com"
+    ]
+    eve_rows = [
+        row
+        for row in rows
+        if row["orders"]["customer_email"] == "eve@example.com"
+    ]
 
     assert len(alice_rows) == 3
     assert len(eve_rows) == 1
 
-    alice_items_by_sku = {row["items"]["sku"]: row["items"] for row in alice_rows}
+    alice_items_by_sku = {
+        row["items"]["sku"]: row["items"] for row in alice_rows
+    }
     assert set(alice_items_by_sku.keys()) == {"SKU-001", "SKU-002", "SKU-003"}
     for item in alice_items_by_sku.values():
         assert item["order_id"] == alice_rows[0]["orders"]["id"]
